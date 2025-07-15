@@ -514,7 +514,7 @@ We try to get the package's version from a constant “⟨O-LABEL⟩-version” 
   "Which special blocks, defined with DEFBLOCK, are supported.")
 
 (cl-defmacro org-defblock
-  (name kwds &optional link-display docstring &rest body)
+    (name kwds &optional link-display docstring &rest body)
   "Declare a new special block, and link, in the style of DEFUN.
 
 A full featured example is at the end of this documentation string.
@@ -619,16 +619,16 @@ Three example uses:
       (lf-extract-optionals-from-rest link-display #'vectorp
                                       docstring    #'stringp
                                       body)
-      `(progn
-        (when ,(not (null link-display)) (push (cons (quote ,name) ,link-display) org--block--link-display))
+    `(progn
+       (when ,(not (null link-display)) (push (cons (quote ,name) ,link-display) org--block--link-display))
        (list
-      ,(org--create-defmethod-of-defblock name docstring (plist-get kwds :backend) kwds body)
-       ;; ⇨ The link type support
-      (eval (backquote (org-deflink ,name
-                   ,(vconcat `[:help-echo (format "%s:%s\n\n%s" (quote ,name) o-label ,docstring)] (or link-display (cdr (assoc name org--block--link-display))))
-                   ;; s-replace-all `((,(format "@@%s:" backend) . "") ("#+end_export" . "") (,(format "#+begin_export %s" backend) . ""))
-                   (s-replace-regexp "@@" ""
-                                     (,(intern (format "org-block/%s" name)) o-backend (or o-description o-label) o-label :o-link? t)))))))))
+        ,(org--create-defmethod-of-defblock name docstring (plist-get kwds :backend) kwds body)
+        ;; ⇨ The link type support
+        (eval (backquote (org-deflink ,name
+                           ,(vconcat `[:help-echo (format "%s:%s\n\n%s" (quote ,name) o-label ,docstring)] (or link-display (cdr (assoc name org--block--link-display))))
+                           ;; s-replace-all `((,(format "@@%s:" backend) . "") ("#+end_export" . "") (,(format "#+begin_export %s" backend) . ""))
+                           (s-replace-regexp "@@" ""
+                                             (,(intern (format "org-block/%s" name)) o-backend (or o-description o-label) o-label :o-link? t)))))))))
 
 ;; WHERE ...
 
@@ -645,42 +645,44 @@ Three example uses:
   (let ((main-arg-name (or (cl-first kwds) 'main-arg))
         (main-arg-value (cl-second kwds))
         (kwds (cddr kwds)))
-       ;; Unless we've already set the docs for the generic function, don't re-declare it.
-       `(if ,(null body)
+    ;; Unless we've already set the docs for the generic function, don't re-declare it.
+    `(if ,(null body)
          (cl-defgeneric ,(intern (format "org-block/%s" name)) (backend raw-contents &rest _)
-           ,docstring)
-
+           ,docstring) ;; For some reason, this “docstring” is not picked up.
+       ;; As such, let's set it manually:
+       (put (quote ,(intern (format "org-block/%s" name))) 'function-documentation ,docstring)
+       
        (cl-defmethod ,(intern (format "org-block/%s" name))
-     ((backend ,(if backend-type `(eql ,backend-type) t))
-      (raw-contents string)
-      &optional
-      ,main-arg-name
-      &rest _
-      &key (o-link? nil) ,@(--reject (keywordp (car it)) (-partition 2 kwds))
-      &allow-other-keys)
-     ,docstring
-     ;; Use default for main argument
-     (when (and ',main-arg-name (s-blank-p ,main-arg-name))
-       (--if-let (plist-get (cdr (assoc ',name org--header-args)) :main-arg)
-           (setq ,main-arg-name it)
-         (setq ,main-arg-name ,main-arg-value)))
+         ((backend ,(if backend-type `(eql ,backend-type) t))
+          (raw-contents string)
+          &optional
+          ,main-arg-name
+          &rest _
+          &key (o-link? nil) ,@(--reject (keywordp (car it)) (-partition 2 kwds))
+          &allow-other-keys)
+         ,docstring
+         ;; Use default for main argument
+         (when (and ',main-arg-name (s-blank-p ,main-arg-name))
+           (--if-let (plist-get (cdr (assoc ',name org--header-args)) :main-arg)
+               (setq ,main-arg-name it)
+             (setq ,main-arg-name ,main-arg-value)))
 
-     (cl-letf (((symbol-function 'org-export)
-                 (lambda (x) "Wrap the given X in an export block for the current backend."
-                   (if o-link? x (format "#+begin_export %s \n%s\n#+end_export" backend x))))
-         ((symbol-function 'org-parse)
-          (lambda (x) "This should ONLY be called within an ORG-EXPORT call."
-            (if o-link? x (format "\n#+end_export\n%s\n#+begin_export %s\n" x backend)))))
+         (cl-letf (((symbol-function 'org-export)
+                    (lambda (x) "Wrap the given X in an export block for the current backend."
+                      (if o-link? x (format "#+begin_export %s \n%s\n#+end_export" backend x))))
+                   ((symbol-function 'org-parse)
+                    (lambda (x) "This should ONLY be called within an ORG-EXPORT call."
+                      (if o-link? x (format "\n#+end_export\n%s\n#+begin_export %s\n" x backend)))))
 
-       ;; Use any headers for this block type, if no local value is passed
-       ,@(cl-loop for k in (mapcar #'car (-partition 2 kwds))
-                  collect `(--when-let (plist-get (cdr (assoc ',name org--header-args))
-                                                  ,(intern (format ":%s" k)))
-                             (when (s-blank-p ,k)
-                               (setq ,k it))))
+           ;; Use any headers for this block type, if no local value is passed
+           ,@(cl-loop for k in (mapcar #'car (-partition 2 kwds))
+                      collect `(--when-let (plist-get (cdr (assoc ',name org--header-args))
+                                                      ,(intern (format ":%s" k)))
+                                 (when (s-blank-p ,k)
+                                   (setq ,k it))))
 
-       (org-export
-        (let ((contents (org-parse raw-contents))) ,@body)))))))
+           (org-export
+            (let ((contents (org-parse raw-contents))) ,@body)))))))
 
 (defun org--pp-list (xs)
   "Given XS as (x₁ x₂ … xₙ), yield the string “x₁ x₂ … xₙ”, no parens.
