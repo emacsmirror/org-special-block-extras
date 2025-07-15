@@ -38,7 +38,6 @@
 
 (use-package yaml)
 (use-package yaml-mode)
-(use-package format-all)
 (use-package ert)
 
 
@@ -56,6 +55,7 @@
     (e2e--make-ert-test-for-yaml-file file)
     (ert (concat "e2e/" (file-name-base file)))))
 
+
 (defun e2e--make-ert-test-for-yaml-file (file)
   "ERT-compatible test for a YAML FILE based on 'input' and 'expectations'."
   ;; Create a separate ert test for each YAML file
@@ -66,7 +66,7 @@
          (actual-results (compute-values input no-prettier)))
 
     (eval `(ert-deftest ,(intern (format "e2e/%s" (file-name-base file))) ()
-	     :expected-result ,(if (map-elt data 'fails) :failed :passed) 
+	         :expected-result ,(if (map-elt data 'fails) :failed :passed) 
              ;; Iterate over each key in expected-results and create assertions
              (map-every-p (lambda (key expected-value)
                             (let ((actual-value (map-elt ,actual-results key 'not-found)))
@@ -81,20 +81,20 @@
                                             (format " Test failed in file “%s” for key “%s”" ,,file (quote ,key))))
                                 (should (equal actual-value expected-value)))))
                           ,expected-results)
-	    
-	     ;; TODO: Also assert that we can create a standalone PDF, unless there's a latex-backend-not-maintained key.
-	     (when nil ;; unless (map-elt data 'latex-backend-not-maintained)
-	       (let* ((file.tex (concat (f-base file) ".tex"))
-		      (required-latex-imports (map-elt data 'required-latex-imports))
-		      (latex (map-elt (map-elt data 'expectations) 'latex)))
-		 (with-temp-file file.tex
-		   (insert
-		    (format "\\documentclass{standalone} %s \\begin{document} %s \\end{document}"
-			    (or required-latex-imports "")
-			    latex)))
-		 (assert (s-contains-p (format "Output written on %s.pdf" (f-base file))
-				       (shell-command-to-string (format "pdflatex -shell-escape -halt-on-error %s; rm -f %s" file.tex file.tex)))))	     
-	     )))))
+	         
+	         ;; TODO: Also assert that we can create a standalone PDF, unless there's a latex-backend-not-maintained key.
+	         (when nil ;; unless (map-elt data 'latex-backend-not-maintained)
+	           (let* ((file.tex (concat (f-base file) ".tex"))
+		              (required-latex-imports (map-elt data 'required-latex-imports))
+		              (latex (map-elt (map-elt data 'expectations) 'latex)))
+		         (with-temp-file file.tex
+		           (insert
+		            (format "\\documentclass{standalone} %s \\begin{document} %s \\end{document}"
+			                (or required-latex-imports "")
+			                latex)))
+		         (cl-assert  (s-contains-p (format "Output written on %s.pdf" (f-base file))
+				                           (shell-command-to-string (format "pdflatex -shell-escape -halt-on-error %s; rm -f %s" file.tex file.tex)))))	     
+	           )))))
 
 
 
@@ -107,12 +107,10 @@
     (with-current-buffer temp-buffer1
       (erase-buffer)
       (insert string1))
-
     ;; Fill the second buffer with string2
     (with-current-buffer temp-buffer2
       (erase-buffer)
       (insert string2))
-
     ;; Call the diff command on the two buffers
     (diff temp-buffer1 temp-buffer2)))
 
@@ -120,7 +118,7 @@
 (cl-defun e2e-run-tests (&optional (directory "."))
   (interactive)
   "Run all e2e tests recursively in DIRECTORY."
-  (loop for file in (directory-files-recursively directory "\\.yaml\\'")
+  (cl-loop for file in (directory-files-recursively directory "\\.yaml\\'")
         do (e2e--make-ert-test-for-yaml-file file))
   ;; Run all tests matching regex
   (ert "e2e/.*"))
@@ -130,29 +128,103 @@
 (cl-defun e2e-update-tests ()
   (interactive)
   ;; update all tests
-  (loop for file in (directory-files-recursively "." "\\.yaml\\'")
-	do (e2e-update-test file)))
+  (cl-loop for file in (directory-files-recursively "." "\\.yaml\\'")
+	       do (e2e-update-test file)))
+
+exec-path 
 
 (cl-defun e2e-update-this-test ()
   (interactive)
   (e2e-update-test (buffer-file-name)))
 
+
 (cl-defun e2e-update-test (file)
-    (let* ((yaml (e2e--read-yaml-file file))
-           (input (map-elt yaml 'input))
-           (no-prettier (map-elt yaml 'no-prettier))
-           ;; Creating an alist and not a hash-table so that ordering matters, for yaml encoding
-           (actual (-concat (list (cons 'input input))
- 			    (map-remove (lambda (k v) (member k '(input expectations))) yaml)
-			    (list (cons 'expectations (map-into (compute-values input no-prettier) 'alist))))))
-      (with-temp-file file
-        ;; (insert (yaml-encode actual)) ;; Nope, it does not honour new lines
-        (insert (e2e--yaml-encode-alist actual))
-        (-let [format-all-formatters '(("YAML" prettier))]
-	  (yaml-mode) (format-all-buffer)))))
+  (let* ((yaml (e2e--read-yaml-file file))
+         (input (map-elt yaml 'input))
+         (no-prettier (map-elt yaml 'no-prettier))
+         ;; Creating an alist and not a hash-table so that ordering matters, for yaml encoding
+         (actual (-concat (list (cons 'input input))
+ 			              (map-remove (lambda (k v) (member k '(input expectations))) yaml)
+			              (list (cons 'expectations (map-into (compute-values input no-prettier) 'alist))))))
+    (with-temp-file file
+      ;; (insert (yaml-encode actual)) ;; Nope, it does not honour new lines
+      (insert (my/prettify 'yaml (e2e--yaml-encode-alist actual))))))
 
 
-	  
+;; brew install tidy-html5
+(should (equal (my/prettify 'html "    <p>It can be useful to draw attention to some important text by enclosing it in
+    a <abbr class=\"tooltip\" title=
+    \"&lt;br&gt;&lt;br&gt;(fn ARG0 ARG &amp;rest ARGS)\">box</abbr>.</p>
+    <div style=
+    \"padding: 1em;background-color: #CCFFCC;border-radius: 15px;font-size: 0.9em;\">
+      <h3>Uses of callout boxes</h3>
+      <p>Such boxes often callout tips, warnings, cautionary info or emphasises
+      core information.</p>
+    </div>")
+               "<p>It can be useful to draw attention to some important text by enclosing it in
+a <abbr class=\"tooltip\"
+      title=\"&lt;br&gt;&lt;br&gt;(fn ARG0 ARG &amp;rest ARGS)\">box</abbr>.</p>
+
+<div style=
+\"padding: 1em;background-color: #CCFFCC;border-radius: 15px;font-size: 0.9em;\">
+  <h3>Uses of callout boxes</h3>
+
+  <p>Such boxes often callout tips, warnings, cautionary info or emphasises
+  core information.</p>
+</div>
+"))
+;;
+(defun my/prettify (language snippet)
+  (if (equal language 'latex)
+      (shell-command-to-string (format "latexindent <<EOF\n%s\nEOF" snippet))
+    (if (equal language 'html) ;; brew install tidy-html5
+        (shell-command-to-string (format "tidy -quiet -indent --wrap 80 --show-warnings no  --show-body-only yes --indent-attributes yes --vertical-space yes --sort-attributes alpha<<EOF\n%s\nEOF" snippet))
+      (shell-command-to-string (format "npx prettier --parser %s <<EOF\n%s\nEOF" language snippet)))))
+;;
+(my/prettify 'html "<html><body><div><h1>Hi</h1><p>This is ugly <b>HTML</b></p><ul><li>One<li>Two</ul></div></body></html>")
+;; ⇒
+"<html>
+  <body>
+    <div>
+      <h1>Hi</h1>
+      <p>This is ugly <b>HTML</b></p>
+      <ul>
+        <li>One</li>
+        <li>Two</li>
+      </ul>
+    </div>
+  </body>
+</html>
+"
+;;
+(when nil How to use prettier cli with snippet via here-docs:
+
+      npx prettier --parser typescript <<EOF
+      function greet(name:string){console.log("Hi, " + name);}
+      greet("Musa");
+      EOF
+
+      )
+;;
+;;
+(my/prettify 'latex "
+\\begin{enumerate}
+   \\item f
+\\item g
+     \\item h
+  \\end{enumerate}")
+;; ⇒
+"
+\\begin{enumerate}
+	\\item f
+	\\item g
+	\\item h
+\\end{enumerate}
+"
+
+
+
+
 (defun e2e--yaml-encode-alist (alist &optional indent-level)
   "Encode an ALIST as a YAML-like string with multiline support.
 Newlines within values are formatted using `|-' style.
@@ -202,25 +274,31 @@ INDENT-LEVEL specifies the current indentation level, defaulting to 0."
 	          (with-temp-buffer
 	            (org-special-block-extras-mode)
                 (insert (org-export-string-as (format "\n%s\n" input) 'html :body-only-please))
-	            (unless no-prettier
-		          (-let [format-all-formatters '(("HTML" prettier))]
-		            ;; TODO: When all my osbe e2e tests pass, then I should remove this ignore-errors.
-		            ;; If something doesn't format, then that means it's likely invalid and should error.
-		            ;; ignore-errors for unclosed <p> tags and other silly html errors
-		            (html-mode) (ignore-errors (format-all-buffer))))	   
-                (s-trim (buffer-string))))
+                (setq _X (buffer-string))
+	            (when nil unless no-prettier
+		              (-let [format-all-formatters '(("HTML" prettier))]
+		                ;; TODO: When all my osbe e2e tests pass, then I should remove this ignore-errors.
+		                ;; If something doesn't format, then that means it's likely invalid and should error.
+		                ;; ignore-errors for unclosed <p> tags and other silly html errors
+		                (html-mode) (ignore-errors (format-all-buffer))))	   
+                (if no-prettier  (s-trim (buffer-string)) (my/prettify 'html  (s-trim (buffer-string))))))
         ;; Try to export, if it fails then just get the err msg.
         (cons 'latex
 	          (condition-case err
 	              (with-temp-buffer
 		            (org-special-block-extras-mode)
-		            (insert (org-export-string-as (format "\n%s\n" input) 'latex :body-only-please))
-		            (unless no-prettier
-		              (-let [format-all-formatters '(("LaTeX" latexindent))] ;; !! brew install latexindent
-		                (latex-mode) (format-all-buffer)))
-		            (s-trim (buffer-string)))
+		            (insert (org-export-str
+                             ing-as (format "\n%s\n" input) 'latex :body-only-please))
+		            (when nil unless no-prettier
+		                  (-let [format-all-formatters '(("LaTeX" latexindent))] ;; !! brew install latexindent
+		                    (latex-mode) (format-all-buffer)))
+                    (if no-prettier  (s-trim (buffer-string)) (my/prettify 'latex (s-trim (buffer-string)))))
 	            (error (format "🚫 The LaTex backend is intentionally unmaintained.\n🫠 Whoops, there seems to be an error: \n %S" err)))))))
    'hash-table))
+
+
+
+
 
 
 (defun my/hash-get-or-compute (hash key compute-fn)
@@ -230,35 +308,37 @@ INDENT-LEVEL specifies the current indentation level, defaulting to 0."
         (puthash key value hash)
         value)))
 
+
+;; 😲
+(setq osbe-example-cache (make-hash-table :test 'equal))
 (defvar osbe-example-cache (make-hash-table :test 'equal)
   "Cache to avoid time re-reading yaml files!")
 (org-defblock osbe-example (file)
- "Render the given FILE as both Org source and rendered HTML result.
+              "Render the given FILE as both Org source and rendered HTML result.
 
 The source is the `input' key; the target is the `expectations.html' key.
 
 Workflow: Write the `input' in an Org buffer, and once the export is to
 my liking, then move the `input' to the relevant yaml file."
- (my/hash-get-or-compute
-  osbe-example-cache
-  file
-  (lambda ()
- (let* ((yaml (e2e--read-yaml-file file))
-         (input (map-elt yaml 'input))
-	 (src (s-trim input))
-	 (tgt (map-elt (map-elt yaml 'expectations) 'html))
-	 ;; "teal" "brown" "gray" "purple" "lime" "green" "blue" "orange" "peach" "pink" "yellow" "custard" 
-	 (src.color (org-subtle-colors "lime"))
-	 (tgt.color (org-subtle-colors "peach")))
-    (cl-letf* (((symbol-function 'make-title) (lambda (it) (format "<h6 style=\"text-align:center; font-family: Lorna; padding: 0; margin: 0;\"> ﴾%s﴿ </h6>" it)))
-	      (src.title (make-title "What You Write"))
-	      (tgt.title (make-title "What You Get")))
-    (format "<div><div style=\"padding: 1em;background-color: %s;border-radius: 15px;font-size: 0.9em;\"> %s <pre class=\"src src-org\">%s</pre></div> <div style=\"padding: 1em;background-color: %s;border-radius: 15px;font-size: 0.9em;\"> %s %s </div></div> <br> <details style=\"background-color: %s\"><summary style=\"text-align:center; font-family: Lorna; padding: 0; margin: 0; cursor: pointer;\">﴾How It’s Implemented﴿</summary> %s </details>"
-	    src.color src.title src
-	    tgt.color tgt.title tgt
-	    (org-subtle-colors "custard")
-	    (org-export-string-as (format "\n #+begin_src emacs-lisp \n %s \n#+end_src \n" (e2e--get-definition (f-base file)))  'html :body-only-please)))))))
-
+              (my/hash-get-or-compute
+               osbe-example-cache
+               file
+               (lambda ()
+                 (let* ((yaml (e2e--read-yaml-file file))
+                        (input (map-elt yaml 'input))
+	                    (src (s-trim input))
+	                    (tgt (map-elt (map-elt yaml 'expectations) 'html))
+	                    ;; "teal" "brown" "gray" "purple" "lime" "green" "blue" "orange" "peach" "pink" "yellow" "custard" 
+	                    (src.color (org-subtle-colors "lime"))
+	                    (tgt.color (org-subtle-colors "peach")))
+                   (cl-letf* (((symbol-function 'make-title) (lambda (it) (format "<h6 style=\"text-align:center; font-family: Lorna; padding: 0; margin: 0;\"> ﴾%s﴿ </h6>" it)))
+	                          (src.title (make-title "What You Write"))
+	                          (tgt.title (make-title "What You Get")))
+                     (format "<div><div style=\"padding: 1em;background-color: %s;border-radius: 15px;font-size: 0.9em;\"> %s <pre class=\"src src-org\">%s</pre></div> <div style=\"padding: 1em;background-color: %s;border-radius: 15px;font-size: 0.9em;\"> %s %s </div></div> <br> <details style=\"background-color: %s\"><summary style=\"text-align:center; font-family: Lorna; padding: 0; margin: 0; cursor: pointer;\">﴾How It’s Implemented﴿</summary> %s </details>"
+	                         src.color src.title src
+	                         tgt.color tgt.title tgt
+	                         (org-subtle-colors "custard")
+	                         (org-export-string-as (format "\n #+begin_src emacs-lisp \n %s \n#+end_src \n" (e2e--get-definition (f-base file)))  'html :body-only-please)))))))
 
 (defun e2e--get-definition (block-name)
   (save-excursion
@@ -274,13 +354,13 @@ my liking, then move the `input' to the relevant yaml file."
 
 ;; TODO: Expose this in use-facing docs, then covert that prose into a yaml test using the workflow documented in osbe-example link type.
 (org-defblock src (language "emacs-lisp" folded nil title "Details")
-	      "yup"
-	      (-let [org--supported-blocks '(details)] ;; to avoid infinite recursive calls for `src'
-		(-let [discloure (if folded "details" "box")]
-		  (org-export-string-as
-		   (format "\n#+begin_%s %s\n#+begin_src %s \n %s \n#+end_src\n#+end_%s\n" discloure title language raw-contents discloure)
-		   'html
-		   :body-only-please))))
+	          "yup"
+	          (-let [org--supported-blocks '(details)] ;; to avoid infinite recursive calls for `src'
+		        (-let [discloure (if folded "details" "box")]
+		          (org-export-string-as
+		           (format "\n#+begin_%s %s\n#+begin_src %s \n %s \n#+end_src\n#+end_%s\n" discloure title language (s-replace "+begin_box" "⊹begin_box" raw-contents) discloure)
+		           'html
+		           :body-only-please))))
 ;;
 ;; Example use
 ;;

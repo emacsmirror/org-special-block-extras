@@ -381,7 +381,7 @@ is displayed in Emacs Org buffers. The keys are as follows.
   That way, upon hover, users can visually see the link contents,
   know what/how the link exports, and actually see the HTML export.
 
-  That is to say, for the ‘shout’ example aboce, the default display is essentially:
+  That is to say, for the ‘shout’ example above, the default display is essentially:
   [:help-echo (org-link/shout o-label o-description 'html)]
 
   You may want to add the following to your Emacs init file:
@@ -1768,6 +1768,11 @@ and, finally, look for the documentation entry using `org-docs-fallback'."
            (funcall org-docs-fallback label)
            (error "Error: No documentation-glossary entry for “%s”!" label))))
 
+
+;; TODO: Since I moved to using generics and defmethods instead of defun, my doc:XYZ is not helpful.
+;; E.g., (documentation #'org-block/box) ⇒ Not useful.
+;; Consider moving back to defuns?
+
 (cl-defun org-docs-insert ()
   "Insert a “doc:𝒳” link from user's documentation-glossary database.
 
@@ -1775,8 +1780,8 @@ It can be tricky to remember what you have, or what documentation entries mentio
 this command gives a searchable way to insert doc links."
   (interactive)
   (thread-last
-      (cl-remove-duplicates (-concat org--docs org--docs-from-libraries)
-                            :test (lambda (x y) (cl-equalp (car x) (car y))))
+    (cl-remove-duplicates (-concat org--docs org--docs-from-libraries)
+                          :test (lambda (x y) (cl-equalp (car x) (car y))))
     (--map (format "%s ∷ %s" (car it) (cl-third it)))
     (completing-read "Insert doc link ∷ ")
     (s-split "∷")

@@ -15,11 +15,20 @@
 
 html-export-style:solarized_light
 
-
+#+begin_src emacs-lisp
+(setq org-export-with-broken-links nil)
 (setq org-export-with-broken-links t)
+(load-file "./org-special-block-extras.el")
+(load-file "./tests/e2e.el")
+(org-html-export-to-html)
+
+;; Run the next line whenever a yaml file changes.
+;; (setq  osbe-example-yaml-cache (make-hash-table :test 'equal))
+#+end_src
+
 
 #+RESULTS:
-: kill-buffer-and-window
+: index.html
 
 #+name: startup-code
 #+begin_src emacs-lisp :exports none :tangle no :exports none
@@ -3587,7 +3596,69 @@ In the future, it'd be nice to account for colours for LaTeX as well.  ( E.g.,
 src_latex[:exports code]{\color{blue}} is a nightmare. )
  #+end_details
 
-** Nice Keystroke Renditions: kbd:C-h_h
+** Folded Details ---Let the user see stuff only if they're interested
+  :PROPERTIES:
+  :CUSTOM_ID: Folded-Details
+  :END:
+
+# (setq  osbe-example-cache (make-hash-table :test 'equal))
+   osbe-example:~/org-special-block-extras/tests/details.yaml
+*** TODO COMMENT Extra notes, either make into yaml tests or more to an FAQ section
+:PROPERTIES:
+:CREATED:  [2025-06-06 Fri 20:12]
+:END:
+The implementation of ~details~ above is hidden away, and this is a
+concrete example of hiding a boring, but important, code snippet.
+Below is a concrete example of a ‘conversation-style’ usage of the
+~details~ block:
+#+begin_box "Here's a nifty puzzle, can you figure it out? 👽"
+Reductions ---incidentally also called ‘folds’[fn:1]--- embody
+primitive recursion and thus computability. For example, what does
+~(-reduce #'/ (number-sequence 1.0 𝓃))~ compute when given a whole
+number 𝓃?
+
+#+begin_details Solution :title-color pink
+Rather than guess-then-check, let's /calculate/!
+
+#+begin_src emacs-lisp :tangle no
+  (-reduce #'/ (number-sequence 1.0 𝓃))
+= ;; Lisp is strict: Evaluate inner-most expression
+  (-reduce #'/ '(1.0 2.0 3.0 … 𝓃))
+= ;; Evaluate left-associating reduction
+  (/ (/ (/ 1.0 2.0) ⋯) 𝓃)
+=;; Arithmetic: (/ (/ a b) c) = (* (/ a b) (/ 1 c)) = (/ a (* b c))
+  (/ 1.0 (* 2.0 3.0 … 𝓃))
+#+END_SRC
+
+We have thus found the above Lisp program to compute the inverse factorial of 𝓃;
+i.e., $\large \frac{1}{𝓃!}$.
+#+end_details
+
+Neato, let's do more super cool stuff ^_^
+#+end_box
+
+
+--------------------------------------------------------------------------------
+
+
+#+begin_box "Tip 🌼"
+If you fear that your readers may not click on details boxes in the HTML export,
+you could, say, have the details heading “flash pink” whenever the user hovers
+over it. This can be accomplished by inserting the following incantation into
+your Org file or place it into your ~org-html-head~ variable.
+#+begin_example org
+#+html: <style>  summary:hover {background:pink;} </style>
+#+end_example
+
+# Which, I will do, for fun.
+#+html: <style>  summary:hover {background:pink;} </style>
+#+end_box
+
+
+Sometimes you want to remark on [[doc:org-block/details][details]] without drawing too much
+attention, and so a tooltip via [[doc:org-block/tooltip][tooltip]] suffices.
+
+** Nice Keystroke Renditions: kbd:C-h_t
   :PROPERTIES:
   :CUSTOM_ID: kbd:nice-keystroke-renditions
   :END:
@@ -3598,7 +3669,7 @@ or kbd:C-c_C-e_h_o to export an Org-mode file to HTML,
 or the useful <kbd:M-s h .>.
 
 - ~kbd:𝒳~ will show a tooltip defining 𝒳, as an Emacs Lisp function, if possible.
-  For example, ~kbd:C-h_h~ is kbd:C-h_h; and likewise =<kbd:M-s h .>= is <kbd:M-s h
+  For example, ~kbd:C-h_t~ is kbd:C-h_t; and likewise =<kbd:M-s h .>= is <kbd:M-s h
   .> (we need to use ~<...>~ since punctuation is not picked up as part of link
   labels).  In contrast, ~kbd:nope~ renders as kbd:nope /without/ a tooltip (nor a
   red border).
@@ -3757,68 +3828,6 @@ Let's have some sanity tests...
 #+HTML: </style>
 #+HTML:
 :End:
-** Folded Details ---Let the user see stuff only if they're interested
-  :PROPERTIES:
-  :CUSTOM_ID: Folded-Details
-  :END:
-
-# (setq  osbe-example-cache (make-hash-table :test 'equal))
-   osbe-example:~/org-special-block-extras/tests/details.yaml
-*** TODO COMMENT Extra notes, either make into yaml tests or more to an FAQ section
-:PROPERTIES:
-:CREATED:  [2025-06-06 Fri 20:12]
-:END:
-The implementation of ~details~ above is hidden away, and this is a
-concrete example of hiding a boring, but important, code snippet.
-Below is a concrete example of a ‘conversation-style’ usage of the
-~details~ block:
-#+begin_box "Here's a nifty puzzle, can you figure it out? 👽"
-Reductions ---incidentally also called ‘folds’[fn:1]--- embody
-primitive recursion and thus computability. For example, what does
-~(-reduce #'/ (number-sequence 1.0 𝓃))~ compute when given a whole
-number 𝓃?
-
-#+begin_details Solution :title-color pink
-Rather than guess-then-check, let's /calculate/!
-
-#+begin_src emacs-lisp :tangle no
-  (-reduce #'/ (number-sequence 1.0 𝓃))
-= ;; Lisp is strict: Evaluate inner-most expression
-  (-reduce #'/ '(1.0 2.0 3.0 … 𝓃))
-= ;; Evaluate left-associating reduction
-  (/ (/ (/ 1.0 2.0) ⋯) 𝓃)
-=;; Arithmetic: (/ (/ a b) c) = (* (/ a b) (/ 1 c)) = (/ a (* b c))
-  (/ 1.0 (* 2.0 3.0 … 𝓃))
-#+END_SRC
-
-We have thus found the above Lisp program to compute the inverse factorial of 𝓃;
-i.e., $\large \frac{1}{𝓃!}$.
-#+end_details
-
-Neato, let's do more super cool stuff ^_^
-#+end_box
-
-
---------------------------------------------------------------------------------
-
-
-#+begin_box "Tip 🌼"
-If you fear that your readers may not click on details boxes in the HTML export,
-you could, say, have the details heading “flash pink” whenever the user hovers
-over it. This can be accomplished by inserting the following incantation into
-your Org file or place it into your ~org-html-head~ variable.
-#+begin_example org
-#+html: <style>  summary:hover {background:pink;} </style>
-#+end_example
-
-# Which, I will do, for fun.
-#+html: <style>  summary:hover {background:pink;} </style>
-#+end_box
-
-
-Sometimes you want to remark on [[doc:org-block/details][details]] without drawing too much
-attention, and so a tooltip via [[doc:org-block/tooltip][tooltip]] suffices.
-
 ** Remark —Inline footnotes, viz HTML tooltips and LaTeX notes in the margin
   :PROPERTIES:
   :CUSTOM_ID: tooltip
